@@ -19,6 +19,8 @@ import urlparse
 import yaml
 import json
 import re
+# Hack
+import random
 import tempfile
 import pprint
 

@@ -1,7 +1,9 @@
 [global]
 	chdir = ""
 	pid file = $name.pid
-        auth supported = cephx
+# Hack - disable cephx by default
+# Xio Messenger currently does not support cephx
+#       auth supported = cephx
 
 	filestore xattr use omap = true
 
@@ -48,7 +50,7 @@
 	filestore apply finisher threads = 3
 
 [mon]
-	debug ms = 1
+#	debug ms = 1
 	debug mon = 20
 	debug paxos = 20
 	mon data avail warn = 5

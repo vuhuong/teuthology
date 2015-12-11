@@ -305,7 +305,9 @@ def add_remotes(ctx, config):
     for name in ctx.config['targets'].iterkeys():
         machs.append(name)
     for t, key in ctx.config['targets'].iteritems():
-        t = misc.canonicalize_hostname(t)
+        # Hack
+        #t = misc.canonicalize_hostname(t)
+        log.debug('Connecting to %s', t)
         try:
             if ctx.config['sshkeys'] == 'ignore':
                 key = None
@@ -344,7 +346,9 @@ def push_inventory(ctx, config):
             info = rem.inventory_info
             lock.update_inventory(info)
     try:
-        push()
+	# Hack
+        # push()
+        pass
     except Exception:
         log.exception("Error pushing inventory")
 

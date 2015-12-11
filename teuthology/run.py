@@ -222,7 +222,8 @@ def get_initial_tasks(lock, config, machine_type):
     if 'roles' in config:
         init_tasks.extend([
             {'selinux': None},
-            {'ansible.cephlab': None},
+# Hack - disable remote ansible task in cephlab
+#            {'ansible.cephlab': None},
             {'clock.check': None}
         ])
 

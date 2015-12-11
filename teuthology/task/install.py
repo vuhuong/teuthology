@@ -86,6 +86,64 @@ def _get_local_dir(config, remote):
             teuthology.sudo_write_file(remote, fname, open(fname).read(), '644')
     return ldir
 
+# Hack - enable installation from local build packages
+def _update_deb_package_list_and_install_local(ctx, remote, debs, config, ldir):
+    dependency = ['sudo', 'apt-get', '-yf', '--force-yes', 'install', 'git', 'gcc', 'make', 'ntp',
+                 'python-nose', 'valgrind', 'genisoimage', 'binutils', 'libaio1', 'python-pip',
+                 'python-virtualenv', 'python-dev' , 'libevent-dev' ,
+                 'libboost-system1.54.0', 'libboost-thread1.54.0', 'libcrypto++9', 'libgoogle-perftools4',
+                 'libjs-jquery', 'libleveldb1', 'libreadline5', 'libsnappy1',
+                 'libtcmalloc-minimal4', 'libunwind8', 'python-blinker', 'python-flask',
+                 'python-itsdangerous', 'python-jinja2', 'python-markupsafe',
+                 'python-pyinotify', 'python-werkzeug', 'xfsprogs', 'libfcgi0ldbl',
+                 'gdebi-core', 'python3-chardet', 'python3-debian', 'python3-six',
+                 'gdisk', 'cryptsetup-bin', 'cryptsetup', 'xml2', 'libboost-program-options1.54.0',
+                 'btrfs-tools', 'liblttng-ust0', 'libbabeltrace-ctf1', 'python-setuptools', 'resource-agents', ]
+    remote.run(args=dependency, stdout=StringIO(),)
+
+    pkgs = ['libboost-', 'librados2_', 'librbd1_', 'libcephfs1_', 'libradosstriper1_',
+            'python-rados_','python-rbd_','python-cephfs_',
+            'python-ceph_', 'ceph-common_', 'ceph_',
+            'radosgw_', 'ceph-test_',
+            'ceph-deploy_', ]
+    to_be_installed_debs = os.listdir(ldir)
+    for pkg in pkgs:
+        for fyle in os.listdir(ldir):
+            fname = "%s/%s" % (ldir, fyle)
+            if fyle.startswith(pkg):
+                log.info("Installing deb "+fname)
+                remote.run(args=['sudo', 'dpkg', '-i', fname],)
+                to_be_installed_debs.remove(fyle)
+
+    # Install any remaining packages
+    log.info("Installing remaining debs ")
+    for fyle in to_be_installed_debs:
+        fname = "%s/%s" % (ldir, fyle)
+        if fyle.endswith(".deb"):
+            log.info("Installing deb "+fname)
+            remote.run(args=['sudo', 'dpkg', '-i', fname],)
+        #Install kernal rbd module if present in the local directory
+        if fyle.startswith('ceph-client-ubuntu_') and fyle.endswith('.tgz'):
+            _install_krbd(ctx, remote, ldir)
+    r = remote.run(args=
+                   ['sudo', 'apt-get',
+                   '-fy', '--force-yes', 'install'])
+
+def _install_krbd(ctx, remote, ldir):
+    """
+    This function will install kernal RBD module
+    """
+    log.info("Updating Kernel RBD module")
+    r = remote.run(args = ['cd', '--', ldir,
+                   run.Raw('&&'),
+                   'sudo', 'tar', '-zxvf', run.Raw('ceph-client-ubuntu_*.tgz'),
+                   run.Raw('&&'), 'cd', run.Raw('ceph-client-ubuntu_*'),
+                   run.Raw('&&'), 'sudo',
+                   './install',
+                   run.Raw('&&'),
+                   'sudo', 'modprobe', 'libceph',
+                   run.Raw('&&'),
+                   'sudo', 'modprobe', 'rbd',],)
 
 def _update_deb_package_list_and_install(ctx, remote, debs, config):
     """
@@ -99,6 +157,12 @@ def _update_deb_package_list_and_install(ctx, remote, debs, config):
     :param debs: list of packages names to install
     :param config: the config dict
     """
+    # Hack - enable installation from local build packages
+    ldir = config.get('local', None)
+    if ldir:
+        srcdir = _get_local_dir(config, remote)
+        _update_deb_package_list_and_install_local(ctx, remote, debs, config, ldir)
+        return
 
     # check for ceph release key
     r = remote.run(
@@ -149,7 +213,9 @@ def _update_deb_package_list_and_install(ctx, remote, debs, config):
             'install',
         ] + ['%s=%s' % (d, version) for d in debs],
     )
-    ldir = _get_local_dir(config, remote)
+
+    # Hack - enable installation from local build packages
+    ldir = config.get('local', None)
     if ldir:
         for fyle in os.listdir(ldir):
             fname = "%s/%s" % (ldir, fyle)
@@ -300,7 +366,9 @@ def verify_package_version(ctx, config, remote):
     # but the qa suites will need reorganized first to run ceph-deploy
     # before the install task.
     # see: http://tracker.ceph.com/issues/11248
-    if config.get("extras"):
+
+    # Hack - skip for version verification for local as well
+    if config.get("extras") or config.get("local"):
         log.info("Skipping version verification...")
         return True
     gitbuilder = _get_gitbuilder_project(ctx, remote, config)
@@ -1232,6 +1300,9 @@ def task(ctx, config):
     if overrides:
         install_overrides = overrides.get('install', {})
         teuthology.deep_merge(config, install_overrides.get(project, {}))
+	# Hack
+        teuthology.deep_merge(config, install_overrides)
+        log.info('install_overrides %s' % install_overrides)
     log.debug('config %s' % config)
 
     rhbuild = None
@@ -1258,6 +1329,8 @@ def task(ctx, config):
         with contextutil.nested(
             lambda: install(ctx=ctx, config=dict(
                 branch=config.get('branch'),
+		# Hack - enable local installation option
+                local=config.get('local'),
                 tag=config.get('tag'),
                 sha1=config.get('sha1'),
                 flavor=flavor,
