@@ -101,11 +101,11 @@ def _update_deb_package_list_and_install_local(ctx, remote, debs, config, ldir):
                  'btrfs-tools', 'liblttng-ust0', 'libbabeltrace-ctf1', 'python-setuptools', 'resource-agents', ]
     remote.run(args=dependency, stdout=StringIO(),)
 
-    pkgs = ['libboost-', 'librados2_', 'librbd1_', 'libcephfs1_', 'libradosstriper1_',
-            'python-rados_','python-rbd_','python-cephfs_',
-            'python-ceph_', 'ceph-common_', 'ceph_',
-            'radosgw_', 'ceph-test_',
-            'ceph-deploy_', ]
+    pkgs = ['libboost-', 'librados2_', 'librbd1_', 'libcephfs1_', 
+            'libcephfs-jni', 'libradosstriper1_',
+            'python-rados_','python-rbd_','python-cephfs_', 'libcephfs-java',
+            'python-ceph_', 'rbd-fuse_', 'ceph-common_', 'ceph_',
+            'radosgw_', 'ceph-test_',]
     to_be_installed_debs = os.listdir(ldir)
     for pkg in pkgs:
         for fyle in os.listdir(ldir):
